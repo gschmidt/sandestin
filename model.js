@@ -3,7 +3,7 @@
 /*****************************************************************************/
 
 export class Pixel {
-  constructor(model, point, outputSlot) {
+  constructor(model, point, outputSlot, side) {
     this.model = model;
 
     this.id = outputSlot;
@@ -15,6 +15,7 @@ export class Pixel {
     this.x = this.point[0];
     this.y = this.point[1];
     this.z = this.point[2];
+    this.side = side;
 
     model.modified = true;
   }
@@ -24,7 +25,7 @@ export class Pixel {
   }
 
   _export() {
-    return this.point;
+    return {...this.point, side: this.side};
   }
 
   static _import(model, exportedPixels) {
@@ -38,20 +39,23 @@ export class Pixel {
 }
 
 export class Node {
-  constructor(model, point) {
+  constructor(model, point, side) {
     this.model = model;
     this.id = model.nodes.length;
     model.nodes[this.id] = this;
 
     this.point = point;
     this.edges = [];
+    this.side = side;
+  
     model.modified = true;
   }
 
   _export() {
     return {
       point: this.point,
-      edges: this.edges.map(edge => edge.id)
+      edges: this.edges.map(edge => edge.id),
+      side: this.side,
     }
   }
 
@@ -64,7 +68,7 @@ export class Node {
 }
 
 export class Edge {
-  constructor(model, startNode, endNode, numPixels, firstOutputSlot) {
+  constructor(model, startNode, endNode, numPixels, firstOutputSlot, side) {
     this.model = model;
     if (startNode.model !== model || endNode.model !== model)
       throw new Error("mixing geometry from different models");
@@ -77,6 +81,8 @@ export class Edge {
     this.endNode = endNode;
     endNode.edges.push(this);
 
+    this.side = side;
+
     this.pixels = [];
     for(let i = 0; i < numPixels; i ++) {
       // Evenly space the pixels along the edge, with the same space between startNode
@@ -85,7 +91,8 @@ export class Edge {
       let pixel = new Pixel(model,
         [0, 1, 2].map(j =>
           startNode.point[j] + (endNode.point[j] - startNode.point[j]) * frac),
-        firstOutputSlot + i
+        firstOutputSlot + i,
+        side
       );
       this.pixels.push(pixel);
     }
@@ -97,7 +104,8 @@ export class Edge {
     return {
       startNode: this.startNode.id,
       endNode: this.endNode.id,
-      pixels: this.pixels.map(pixel => pixel.id)
+      pixels: this.pixels.map(pixel => pixel.id),
+      side: this.side
     }
   }
 
