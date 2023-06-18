@@ -132,12 +132,12 @@ async function buildZomeFromObjFile(pathToObjFile) {
 
       const nodeKey = `side${side}Node`;
       if (! from[nodeKey])
-        from[nodeKey] = new Node(model, displace(from.point)); 
+        from[nodeKey] = new Node(model, displace(from.point), side); 
       if (! to[nodeKey])
-        to[nodeKey] = new Node(model, displace(to.point));
+        to[nodeKey] = new Node(model, displace(to.point), side);
 
       const pixelsOnEdge = Math.round(pixelsPerMeter * dist(from.point, to.point));
-      new Edge(model, from[nodeKey], to[nodeKey], pixelsOnEdge, nextOutputSlot);
+      new Edge(model, from[nodeKey], to[nodeKey], pixelsOnEdge, nextOutputSlot, side);
       nextOutputSlot += pixelsOnEdge;
 
       from = to;
