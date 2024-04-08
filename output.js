@@ -98,7 +98,7 @@ function parseFormat(format) {
   function _parseFormat(format) {
     const keys = {r: 0, g: 1, b: 2, '-': null};
     const channelMap = [];
-    const paddingChannels = 0;
+    let paddingChannels = 0;
 
     for (let i = 0; i < format.length; i ++) {
       const channel = keys[format.toLowerCase()[i]];
