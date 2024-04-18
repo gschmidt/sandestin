@@ -8,6 +8,7 @@ To contribute, please make a Pull Request.
 ### Set up the simulator
 ```
 npm install
+pip3 install matplotlib
 ```
 
 ### Run the simulator
