@@ -13,7 +13,7 @@ import { default as toml } from 'toml';
 /* Generators (pattern generator programs)                                   */
 /*****************************************************************************/
 
-import { FrameGenerator } from './graphscript4.js'; // "it's a working title"
+import { FrameGenerator } from './graphscript.js'; // "it's a working title"
 
 // A generator defined by a JavaScript generator function (in this case, literally a
 // generator in the function* sense)
