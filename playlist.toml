@@ -1,4 +1,8 @@
 [[items]]
+script = "./scripts/script-test.js"
+seconds = 10
+
+[[items]]
 pattern = "top_down_rainbow"
 seconds = 10
 options = { color_map_name = "twilight" }

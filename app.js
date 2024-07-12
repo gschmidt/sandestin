@@ -10,93 +10,56 @@ import { default as child_process } from 'child_process';
 import { default as toml } from 'toml';
 
 /*****************************************************************************/
-/* Old patterns                                                              */
+/* Generators (pattern generator programs)                                   */
 /*****************************************************************************/
 
-/* Karen's patterns - to be ported back to Python
-class LinearTopToBottomPattern {
-  get(frame) {
-    let layer = new Layer(frame.model);
-    let threshold = 1 - frame.displayTime/5 % 1; 
-    let topZ = frame.model.center()[2] * 2;
-    let lightEndZ = threshold * topZ;
-    frame.model.edges.forEach(edge => {
-      let colorTemplate = [255,255,255]; // TODO: add colors 
-      edge.pixels.forEach(pixel => {
-        if (pixel.z > lightEndZ) {
-          let brightness = 1 - (pixel.z - lightEndZ) / ( topZ/3 );
-          if (brightness > 0) {
-            let color = colorTemplate.map(x => x * brightness);
-            layer.setRGB(pixel, color);
-          }
-        }
-      })
-    })
-    return layer;
+import { FrameGenerator } from './graphscript4.js'; // "it's a working title"
+
+// A generator defined by a JavaScript generator function (in this case, literally a
+// generator in the function* sense)
+class ScriptGenerator {
+  // model: a Model to pass to the generator
+  // framesPerSecond: the fps to tell the generator to render at
+  // scriptPath: this file should contain a default export that is a FrameGenerator compatible generator function
+  // options: additional options to pass to the generator as its first argument
+  constructor(model, framesPerSecond, scriptPath, options) {
+    // XXX very confusing class names
+    this.model = model;
+    this.framesPerSecond = framesPerSecond;
+    this.scriptPath = scriptPath;
+    this.options = options;
+    this.frameGenerator = null, 
+    this.outputBuffer = Buffer.alloc(4 + this.model.pixelCount() * 4);
+    this.nextFrameNumber = 0;
   }
-}
 
-
-class LinearRandomWalkPattern{
-  // TODO: ideally the tail of each light can be seen on previous edge (real fading effect) 
-
-  constructor(number){
-    this.number = number; // number of light particles flowing around
-    this.edgeIndices =  Array.from({length: this.number}, () => Math.floor(Math.random() * this.number)); //random starting edges
-    this.directions = Array(this.number).fill("down"); 
-  }
-  get(frame) {
-    let layer = new Layer(frame.model);
-    for (let p = 0; p < this.number; p++){
-      let currEdge = frame.model.edges[this.edgeIndices[p]];
-      let threshold = (frame.displayTime  ) % 1; // precentage of the edge that will have color
-      let brightestPixelIndex = Math.ceil(threshold * currEdge.pixels.length);
-      let colorTemplate = [255,255,255]; //TODO: add colors
-      for (let i = 0; i < brightestPixelIndex; i++) {
-        let brightness = i / brightestPixelIndex; // 0 to 1 for fading effect 
-        let color = colorTemplate.map(x => x * brightness);
-        if (this.directions[p] == "down") {
-          layer.setRGB(currEdge.pixels[i], color);
-        }
-        else{
-          layer.setRGB(currEdge.pixels[currEdge.pixels.length-1-i], color);
-        }
-      }
-
-      if (brightestPixelIndex == currEdge.pixels.length){ //find a neighbor edge to be the next edge
-        let currentPoint = this.directions[p] == "down" ? currEdge.endNode.point : currEdge.startNode.point;
-        let nextEdgesDown = frame.model.edges.filter(edge => edge.startNode.point === currentPoint && edge.id != currEdge.id);
-        let nextEdgesUp = frame.model.edges.filter(edge => edge.endNode.point === currentPoint && edge.id != currEdge.id);
-        if (nextEdgesDown.length == 0 && nextEdgesUp.length == 0) { // reset to 0
-          this.edgeIndices[p] = 0;
-        }
-        else{ // choose a random neighbor
-          const random = Math.floor(Math.random() * (nextEdgesDown.length + nextEdgesUp.length));
-          if (random >= nextEdgesDown.length) {
-            this.edgeIndices[p] = nextEdgesUp[random - nextEdgesDown.length].id; 
-            this.directions[p] = "up"
-          }
-          else{
-            this.edgeIndices[p] = nextEdgesDown[random].id; 
-            this.directions[p] = "down"
-          }
-          // console.log("curr edge id:", currEdge.id , "next edge id: ", this.edgeIndex, "direction: ", this.direction)
-        }
-      }
-
-
+  async getFrame() {
+    if (! this.frameGenerator) {
+      const module = await import(this.scriptPath); // XXX check that it exists first, in the ctor (and resolve path)
+      if (! Object.hasOwn(module, 'default'))
+        throw new Error("Script ${this.scripthPath} should have a default export that is a generator function");
+      const generatorFunc = module['default'];
+      this.frameGenerator = new FrameGenerator(this.model, generatorFunc, this.framesPerSecond, this.options);
     }
-    
-    return layer;
+    // should this return a Canvas (with the right pixels currently on it) rather than a raw buffer?
+    const buffer = this.frameGenerator.nextFrame()
+    if (! buffer instanceof Buffer || buffer.length != this.model.pixelCount() * 4)
+      throw new Error("root node of script didn't return a buffer of the right length");
+
+    // We're still expecting each frame to be prefixed with a four-byte frame number (currently unused), so
+    // we have to put that on. Could refactor to remove the copy for performance.
+    this.outputBuffer.writeInt32LE(this.nextFrameNumber ++, 0);
+    buffer.copy(this.outputBuffer, 4);
+    return this.outputBuffer;
+  }
+
+  close() {
+    // should be able to just let it garbage collected?
   }
 }
-*/
 
-/*****************************************************************************/
-/* Generators (external pattern generator programs)                          */
-/*****************************************************************************/
-
-class Generator {
+// A generator defined by an external program in any language (started as a subprocess)
+class ExternalGenerator {
   // model: a Model to pass to the generator
   // framesPerSecond: the fps to tell the generator to render at
   // program: eg 'node', 'python'.. should be in $PATH
@@ -107,7 +70,7 @@ class Generator {
     const frameSize = 4 + 4 * totalPixels;
 
     const toolConfiguration = {
-      framesPerSecond: framesPerSecond,
+      framesPerSecond: framesPerSecond, 
       model: model.export(),
       options: options
     };
@@ -167,6 +130,7 @@ class Generator {
 /*****************************************************************************/
 
 import { application, default as express } from 'express';
+import { isGeneratorFunction } from 'util/types';
 
 class Simulator {
   constructor(config, model) {
@@ -259,6 +223,10 @@ async function main() {
     throw new Error("Playlist must have at least one item");
 
   function generatorForPlaylistItem(playlistItem) {
+    if (playlistItem.script) {
+      return new ScriptGenerator(model, framesPerSecond, playlistItem.script, playlistItem.options);
+    }
+
     const pattern = patterns[playlistItem.pattern];
     if (! pattern)
       throw new Error(`no such pattern ${playlistItem.pattern}`);
@@ -268,7 +236,7 @@ async function main() {
       ...(playlistItem.options || {}),
     };
 
-    return new Generator(model, framesPerSecond, pattern.program,
+    return new ExternalGenerator(model, framesPerSecond, pattern.program,
       [ path.join(patternsDir, pattern.script) ], options);
   }
 
