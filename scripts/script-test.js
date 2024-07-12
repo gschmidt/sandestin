@@ -1,4 +1,4 @@
-import { setRoot, now, model, untilTime } from '../graphscript.js'; // "it's a working title"
+import { setRoot, now, model, untilTime } from '../scripting.js';
 
 function Sawtooth(from, to, period, position) {
   return new class Sawtooth {

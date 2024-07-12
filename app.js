@@ -13,50 +13,9 @@ import { default as toml } from 'toml';
 /* Generators (pattern generator programs)                                   */
 /*****************************************************************************/
 
-import { FrameGenerator } from './graphscript.js'; // "it's a working title"
-
 // A generator defined by a JavaScript generator function (in this case, literally a
 // generator in the function* sense)
-class ScriptGenerator {
-  // model: a Model to pass to the generator
-  // framesPerSecond: the fps to tell the generator to render at
-  // scriptPath: this file should contain a default export that is a FrameGenerator compatible generator function
-  // options: additional options to pass to the generator as its first argument
-  constructor(model, framesPerSecond, scriptPath, options) {
-    // XXX very confusing class names
-    this.model = model;
-    this.framesPerSecond = framesPerSecond;
-    this.scriptPath = scriptPath;
-    this.options = options;
-    this.frameGenerator = null, 
-    this.outputBuffer = Buffer.alloc(4 + this.model.pixelCount() * 4);
-    this.nextFrameNumber = 0;
-  }
-
-  async getFrame() {
-    if (! this.frameGenerator) {
-      const module = await import(this.scriptPath); // XXX check that it exists first, in the ctor (and resolve path)
-      if (! Object.hasOwn(module, 'default'))
-        throw new Error("Script ${this.scripthPath} should have a default export that is a generator function");
-      const generatorFunc = module['default'];
-      this.frameGenerator = new FrameGenerator(this.model, generatorFunc, this.framesPerSecond, this.options);
-    }
-    // should this return a Canvas (with the right pixels currently on it) rather than a raw buffer?
-    const buffer = this.frameGenerator.nextFrame()
-    if (! buffer instanceof Buffer || buffer.length != this.model.pixelCount() * 4)
-      throw new Error("root node of script didn't return a buffer of the right length");
-
-    // We're still expecting each frame to be prefixed with a four-byte frame number (currently unused), so
-    // we have to put that on. Could refactor to remove the copy for performance.
-    this.outputBuffer.writeInt32LE(this.nextFrameNumber ++, 0);
-    buffer.copy(this.outputBuffer, 4);
-    return this.outputBuffer;
-  }
-
-  close() {
-    // should be able to just let it garbage collected?
-  }
-}
+import { ScriptGenerator } from './scripting.js';
 
 // A generator defined by an external program in any language (started as a subprocess)
 class ExternalGenerator {
@@ -124,13 +83,11 @@ class ExternalGenerator {
   }
 }
 
-
 /*****************************************************************************/
 /* Simulator                                                                 */
 /*****************************************************************************/
 
 import { application, default as express } from 'express';
-import { isGeneratorFunction } from 'util/types';
 
 class Simulator {
   constructor(config, model) {
