@@ -1,4 +1,5 @@
 import { setRoot, now, model, untilTime } from '../scripting.js';
+import { randomInt } from '../utils.js';
 
 function Sawtooth(from, to, period, position) {
   return new class Sawtooth {
@@ -56,6 +57,16 @@ class Canvas {
     this.buffer[offset ++] = a;
   }
 
+  fade(frac) {
+    let offset = 0;
+    for (let i = 0; i < this.model.pixelCount(); i ++) {
+      this.buffer[offset ++] *= frac;
+      this.buffer[offset ++] *= frac;
+      this.buffer[offset ++] *= frac;
+      offset ++; /* leave alpha alone */      
+    }
+  }
+
   pushPaintFunc(func) {
     this.paintFuncs.push(func);
   }
@@ -68,17 +79,25 @@ class Canvas {
 }
 
 export default function* () {
+  let numPixels = 10;
   let r = Sawtooth(0, 255, 1);
   let g = Sawtooth(0, 255, 2);
   let b = Sawtooth(0, 255, 3);
+  let f = Sawtooth(1, .75, 2)
 
   let c = new Canvas;
   setRoot(c);
   c.pushPaintFunc(() => {
-    for (const pixel of c.model.pixels) {
-      c.setRGB(pixel.outputChannel(), r.get(), g.get(), b.get());
+    c.fade(f.get());
+
+    for (let i = 0; i < numPixels; i ++) {
+      const index = randomInt(0, model().pixelCount() - 1);
+      c.setRGB(index, r.get(), g.get(), b.get());
     }
   });
+
+  yield untilTime(3);
+  numPixels = 100;
 
   yield untilTime(5);
   r.doubleSpeed();
@@ -87,4 +106,5 @@ export default function* () {
   yield untilTime(9);
   b.doubleSpeed();
 }
+
 

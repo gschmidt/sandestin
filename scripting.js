@@ -1,3 +1,6 @@
+import { default as path } from 'path';
+import { pathToRootOfTree } from './utils.js';
+
 let currentScriptGenerator = null;
 
 export class ScriptGenerator {
@@ -12,7 +15,7 @@ export class ScriptGenerator {
     this.nextFrameTime = 0;
     this.outputBuffer = Buffer.alloc(4 + this.model.pixelCount() * 4);
 
-    this.scriptPath = scriptPath;
+    this.scriptPath = path.join(pathToRootOfTree(), 'scripts', scriptPath);
     this.options = options;
     this.generatorObject = null;
     this.lastGeneratorResult = null;
@@ -20,9 +23,9 @@ export class ScriptGenerator {
 
   async getFrame() {
     if (! this.generatorObject) {
-      const module = await import(this.scriptPath); // XXX check that it exists first, in the ctor (and resolve path)
+      const module = await import(this.scriptPath);
       if (! Object.hasOwn(module, 'default'))
-        throw new Error("Script ${this.scripthPath} should have a default export that is a generator function");
+        throw new Error("Script ${this.scripthPath} should have a default export (the generator function for the script)");
       const generatorFunc = module['default'];
       this.generatorObject = generatorFunc(this.options);
     }
@@ -36,7 +39,7 @@ export class ScriptGenerator {
           (! this.lastGeneratorResult.done && this.nextFrameTime >= this.lastGeneratorResult.value.untilTime)) {
         this.lastGeneratorResult = this.generatorObject.next();
         if (! this.lastGeneratorResult.done && ! Object.hasOwn(this.lastGeneratorResult.value, 'untilTime'))
-          throw new Error("bad generator return value");
+          throw new Error("script generator yielded unexpected value");
       }
  
       // should this return a Canvas (with the right pixels currently on it) rather than a raw buffer?
@@ -67,19 +70,19 @@ export class ScriptGenerator {
 
 export function setRoot(node) {
   if (! currentScriptGenerator)
-    throw new Error("this should only be called inside a frame generator");
+    throw new Error("this should only be called inside a script");
   currentScriptGenerator._setRoot(node);
 }
 
 export function now() {
   if (! currentScriptGenerator)
-    throw new Error("this should only be called inside a frame generator");
+    throw new Error("this should only be called inside a script");
   return currentScriptGenerator.nextFrameTime;
 }
 
 export function model() {
   if (! currentScriptGenerator)
-    throw new Error("this should only be called inside a frame generator");
+    throw new Error("this should only be called inside a script");
   return currentScriptGenerator.model;
 }
 

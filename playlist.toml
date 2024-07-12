@@ -1,6 +1,6 @@
 [[items]]
-script = "./scripts/script-test.js"
-seconds = 10
+script = "script-test.js"
+seconds = 20
 
 [[items]]
 pattern = "top_down_rainbow"
