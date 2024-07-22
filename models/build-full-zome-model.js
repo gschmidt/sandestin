@@ -122,17 +122,27 @@ async function buildZomeFromObjFile(pathToObjFile) {
       baseVerts.push(v);
   baseVerts.sort((v1, v2) => v2.cyl.theta - v1.cyl.theta);
 
+  // Count the number of tiers in the zome
+  let numTiers = 0;
+  for (let v = baseVerts[0]; v !== null; v = findNextVert(v, { clockwise: true, center: true })) {
+    numTiers ++;
+  }
+  console.log(`the zome has ${numTiers} tiers`);
+
   // Now trace the LED strands up from each bottom vertex in both clockwise and counterclockwise directions.
   // Do clockwise first and let the clockwise strand be the one traced all the way up to the top.
   function traceStrand(start, accept, side) {
     let startOutputSlot = nextOutputSlot;
+    let sideName = side ? "in" : "out";
+    let spinName = accept.clockwise ? "cw" : "ccw";
 
     let from = start;
+    let tier = numTiers - 1; // tiers are 0-based
     while (from) {
       let to = findNextVert(from, accept);
       if (! to)
         break;
-      console.log(`segment from ${JSON.stringify(from.cyl)} to ${JSON.stringify(to.cyl)}`);
+      console.log(`segment from ${JSON.stringify(from.cyl)} to ${JSON.stringify(to.cyl)} (tier ${tier - 1} to ${tier})`);
 
       function displace(point) {
         // Move half a strut width toward (side == 0) or away (side == 1) the center line
@@ -144,15 +154,17 @@ async function buildZomeFromObjFile(pathToObjFile) {
 
       const nodeKey = `side${side}Node`;
       if (! from[nodeKey])
-        from[nodeKey] = new Node(model, displace(from.point)); 
+        from[nodeKey] = new Node(model, displace(from.point), { tier: tier, side: sideName });
       if (! to[nodeKey])
-        to[nodeKey] = new Node(model, displace(to.point));
+        to[nodeKey] = new Node(model, displace(to.point), { tier: tier - 1, side: sideName });
 
       const pixelsOnEdge = Math.round(pixelsPerMeter * dist(from.point, to.point));
-      new Edge(model, from[nodeKey], to[nodeKey], pixelsOnEdge, nextOutputSlot);
+      new Edge(model, from[nodeKey], to[nodeKey], pixelsOnEdge, nextOutputSlot,
+        { from: tier - 1, to: tier, spin: spinName, side: sideName});
       nextOutputSlot += pixelsOnEdge;
 
       from = to;
+      tier --;
     }
 
     console.log(`total ${nextOutputSlot - startOutputSlot} pixels in strand`);
@@ -168,6 +180,14 @@ async function buildZomeFromObjFile(pathToObjFile) {
     receiver ++;
   }
 
+  // Finally, match up the sides
+  for (let v of verts) {
+    if (! v.side0Node || ! v.side1Node)
+      throw new Error("nodes weren't created for both sides of vert?");
+    model.setCorrespondingNodes(v.side0Node, v.side1Node);
+  }
+
+  model.validate(true);
   return model;
 }
 
