@@ -191,6 +191,22 @@ export class Model {
     return this._findByCriteria(criteria, this.edges);
   }
 
+  strands(bigStrandSize, smallStrandSize) {
+    let strands = []
+    let isBigStrand = true;
+    for (let strandStartIndex = 0; strandStartIndex < this.pixelCount(); ) {
+      if (isBigStrand) {
+        strands = [...strands, this.pixels.slice(strandStartIndex, strandStartIndex+bigStrandSize)]
+        strandStartIndex += bigStrandSize
+      } else {
+        strands = [...strands, this.pixels.slice(strandStartIndex, strandStartIndex+smallStrandSize)]
+        strandStartIndex += smallStrandSize
+      }
+      isBigStrand = !isBigStrand
+    }
+    return strands;
+  }
+
   // Mutate the model by marking two nodes as being the "other side" of each other.
   // This should be done after the model is fully constructed and it will update
   // any edges between other-side-related nodes as well.
