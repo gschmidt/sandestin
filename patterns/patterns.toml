@@ -101,3 +101,15 @@ name = "heartbeat"
 script = "heartbeat.py"
 program = "python3"
 options = { color_map_name = "Reds"}
+
+[[patterns]]
+name = "mako"
+script = "mako.js"
+program = "node"
+options = {big_strand_size = 360, small_strand_size = 315}
+
+[[patterns]]
+name = "fire"
+script = "fire.js"
+program = "node"
+options = {big_strand_size = 360, small_strand_size = 315}
